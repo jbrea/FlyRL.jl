@@ -45,8 +45,6 @@ jobs:
       - uses: codecov/codecov-action@v1
         with:
           file: lcov.info
-## NOTE: uncomment below to generate and deploy docs, also add the relevant deploy key as described
-## in https://juliadocs.github.io/Documenter.jl/dev/man/hosting/#Authentication:-SSH-Deploy-Keys
 docs:
   name: Documentation
   runs-on: ubuntu-latest
