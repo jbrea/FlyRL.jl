@@ -1,9 +1,10 @@
+import InteractiveUtils: subtypes
 @testset "Encoder API" begin
     track = FlyRL.random_track()
     for enc in subtypes(FlyRL.AbstractEncoder)
         @show enc
-        if enc == FlyRL.VectorEncoder
-            e = enc(FlyRL.ArmEncoder())
+        if enc ∈ (FlyRL.VectorEncoder, FlyRL.DurationPerStateEncoder, FlyRL.LevelEncoder)
+            e = enc(FlyRL.ShockArmEncoder())
         elseif enc == FlyRL.MarkovKEncoder
             e = enc(2, FlyRL.ArmEncoder())
         elseif enc == FlyRL.DynamicCompressEncoder

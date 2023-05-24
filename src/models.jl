@@ -162,6 +162,7 @@ function DeltaPositionModel(; nhidden = 32, σ = tanh, T = Float64,
                            angleˌ1 = zero(T)
                           )
     ks = encoder.keys
+#     encoded = ComponentArray(; NamedTuple{ks}(zeros(T, length(ks)))..., Δsin_angle = 0., Δcos_angle = 0., Δspeed = 0.)
     encoded = ComponentArray(NamedTuple{ks}(zeros(T, length(ks))))
     if f === nothing
         f = MLP(DenseLayer(length(encoded), nhidden, σ; T),
@@ -194,6 +195,9 @@ EnzymeRules.inactive(::typeof(encode!), args...) = nothing
     d.state.Δx = dx
     d.state.Δy = dy
     encode!(d.enc, d.encoded, d.state)
+#     d.encoded.Δsin_angle = sin(d.state.angle - d.state.angleˌ1)
+#     d.encoded.Δcos_angle = cos(d.state.angle - d.state.angleˌ1)
+#     d.encoded.Δspeed = d.encoded.speed - d.encoded.speedˌ1
     ret = d.f(d.encoded)[]
 #     if show
 #         @show d.encoded d.state ret

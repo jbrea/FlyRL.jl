@@ -60,11 +60,15 @@ function distance2wall(e::AbstractEncoder, x, y, ox, oy)
         scale = e.scale,
     )
 end
-Base.@kwdef struct Distance2WallsEncoder{E} <: AbstractEncoder
-    max_distance::Float64 = 40.0
-    scale::Float64 = max_distance
-    stepsize::Float64 = 1.5
+struct Distance2WallsEncoder{E} <: AbstractEncoder
+    max_distance::Float64
+    scale::Float64
+    stepsize::Float64
 end
+function Distance2WallsEncoder{E}(; max_distance = 40, scale = max_distance, stepsize = 1.5) where E
+    Distance2WallsEncoder{E}(max_distance, scale, stepsize)
+end
+Distance2WallsEncoder(; kwargs...) = EightWallsEncoder(; kwargs...)
 """
     FourWallsEncoder(; max_distance = 40, scale = max_distance, stepsize = 1.5)
 
@@ -152,6 +156,7 @@ Encodes the closest wall as determined with `encoder` (either [`FourWallsEncoder
 struct ClosestWallEncoder{E} <: AbstractEncoder
     encoder::E
 end
+ClosestWallEncoder() = ClosestWallEncoder(EightWallsEncoder())
 labels(::ClosestWallEncoder) = (:closest_wall,)
 function encode(e::ClosestWallEncoder, track)
     hascols(e, track) && return getcols(e, track)
@@ -163,22 +168,6 @@ function encode!(e::ClosestWallEncoder, out::ComponentArray, in::ComponentArray)
     out.closest_wall = minimum(distance2walls(e.encoder, in.x, in.y, in.ox, in.oy))
     out
 end
-
-struct ApproxFourWallsEncoder{M} <: AbstractEncoder
-    mlp::M
-end
-function ApproxFourWallsEncoder()
-    w1, b1, w2, b2 = deserialize("fwmlp.dat")
-    ApproxFourWallsEncoder(MLP(DenseLayer(relu, zero(b1), w1, b1),
-                               DenseLayer(sigmoid, zero(b2), w2, b2)))
-end
-@inline function encode!(e::ApproxFourWallsEncoder, out::ComponentArray, in::ComponentArray)
-    encode!(OrientationEncoder(), in, in)
-    e.mlp([in.x, in.y, in.ox, in.oy])
-    out.ahead, out.right, out.left, out.behind = e.mlp.layers[end].output
-    out
-end
-labels(::ApproxFourWallsEncoder) = (:ahead, :right, :left, :behind)
 
 """
     OrientationEncoder()
@@ -571,7 +560,7 @@ Encodes angles as `(sin(angle), cos(angle))` (see also [`AngleEncoder`](@ref)).
 """
 struct AngleEncoder2D <: AbstractEncoder end
 labels(::AngleEncoder2D) = (:sin_angle, :cos_angle)
-function encode(::AngleEncoder2D, track::DataFrame)
+function encode(e::AngleEncoder2D, track::DataFrame)
     hascols(e, track) && return getcols(e, track)
     angle = encode(AngleEncoder(), track).angle
     (sin_angle = sin.(angle), cos_angle = cos.(angle))

@@ -7,7 +7,20 @@ makedocs(
     format = Documenter.HTML(; prettyurls = get(ENV, "CI", nothing) == "true"),
     authors = "Johanni Brea",
     sitename = "FlyRL.jl",
-    pages = Any["index.md", "api.md"]
+    pages = Any["Introduction" => "index.md",
+                "Examples" => [
+                               "Abstract Model" => "abstract_model.md",
+                               "Detailed Model" => "detailed_model.md"
+                              ],
+                "API" => [
+                          "Loading Files" => "io.md",
+                          "Encoders" => "encoders.md",
+                          "Models" => "models.md",
+                          "Fitting" => "fitting.md",
+                          "Simulations" => "simulations.md",
+                          "Summary Statistics" => "summary_stats.md"
+                         ]
+               ]
     # strict = true,
     # clean = true,
     # checkdocs = :exports,
