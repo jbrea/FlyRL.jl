@@ -1,4 +1,4 @@
 ```@autodocs
 Modules = [FlyRL]
-Pages = ["simulations.md"]
+Pages = ["simulators.jl"]
 ```

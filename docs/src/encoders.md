@@ -19,5 +19,5 @@ Here is a list of built-in encoders.
 
 ```@autodocs
 Modules = [FlyRL]
-Pages = ["io.jl"]
+Pages = ["encoders.jl"]
 ```
