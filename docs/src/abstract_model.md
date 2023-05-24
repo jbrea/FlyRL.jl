@@ -6,7 +6,7 @@ policy gradient reinforcement learning method.
 
 First we load the data and plot one recording.
 
-```
+```julia
 using FlyRL, DataFrames
 import FlyRL: read_directory, plot_track
 
@@ -24,7 +24,7 @@ indicates the center of the maze.
 
 ## Preprocessing the data
 Now we define a preprocessor of the raw data.
-```
+```julia
 import FlyRL: Preprocessor, ShockArmEncoder, DynamicCompressEncoder, MarkovKEncoder,
               VectorEncoder, LevelEncoder, preprocess
 
@@ -49,7 +49,7 @@ log-probability of the data given the model and some default parameters that inc
 discount factor, the learning rate and the initial transition probabilities between
 abstract states.
 
-```
+```julia
 import FlyRL: Model, PolicyGradientAgent, params, logprob
 
 model = Model(PolicyGradientAgent(Din = length(input[1]),
@@ -61,20 +61,20 @@ logprob(model, tracks[end], θ)
 
 Let us now find the parameters that optimize the log-probability.
 
-```
+```julia
 import FlyRL: train
 result = train(model, tracks[end], θ, maxtime = 20, print_interval = 3)
 ```
 
 The log-probability with the fitted parameters is much higher than the value we obtained
 above.
-```
+```julia
 logprob(model, tracks[end], result.params)
 ```
 
 ## Generate simulated data
 We can now use the fitted model to obtain simulated tracks.
-```
+```julia
 import FlyRL: Environment, in_shock_arm, simulate
 
 env = Environment(; preprocessor, shock = in_shock_arm);
@@ -82,14 +82,14 @@ x, s, a, logp = simulate(model.agent, env, result.params, 50)
 ```
 
 We can look at the simulation result by decoding the states `x`
-```
+```julia
 import FlyRL: decode
 
 decode(preprocessor.input, x) |> DataFrame
 ```
 
 Let us compare the simulated data to the recorded data
-```
+```julia
 import FlyRL: plot_compare_probs
 
 plot_compare_probs(decode(preprocessor.input, input).shock_arm,
@@ -109,7 +109,7 @@ look different, but on average a reduction of the visits to the shock arm is vis
 ## Model-fitting for data analysis
 
 Let us fit a few recorded tracks and look at the learning rates and discount factors.
-```
+```julia
 function fit_lr_and_gamma(model, tracks)
     η = Float64[]
     γ = Float64[]
@@ -125,7 +125,7 @@ lr_and_gamma = fit_lr_and_gamma(model, tracks) # this may take some time
 ```
 
 We plot now some summary statistics of the data, together with the fitted parameters.
-```
+```julia
 import FlyRL: plot_summaries
 import FlyRL: RelativeVisitsToShockArm, RelativeTimeInShockArm, ChangeOf
 using CairoMakie
@@ -168,7 +168,7 @@ initial conditions and the seed of the pseudo-random number generator.
 In the following we use the fitted parameters found in [Fitting a reinforcement learning agent](@ref)
 and we simulate tracks that have the same duration as the recorded tracks.
 
-```
+```julia
 function simulated_tracks(model, env, θ, Ts)
     res = []
     for T in Ts
@@ -191,7 +191,7 @@ model. Note that we do not plot the relative time spent in the shock arm, becaus
 abstract model does not simulate the durations spent in each arm.
 
 Could we even get similar behaviour, if the learning rate were 0?
-```
+```julia
 newparams = copy(result.params)
 newparams.η = 0.
 sim_tracks2 = simulated_tracks(model, env, newparams, Ts)

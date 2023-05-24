@@ -3,7 +3,7 @@
 We load the same data as in the previous example. But this time we intend to simulated the
 actual movement of the fly in densly discretized time and space.
 
-```
+```julia
 using FlyRL, DataFrames
 import FlyRL: read_directory, plot_track
 
@@ -17,7 +17,7 @@ We will use a model, where the probability of moving to a neighbouring x-y-posit
 depends on the speed, the angle relative to the current orientation, previous speed and
 angle and the distances to the next walls. This probability will be parameterized by a
 simple feedforward neural network with one hidden layer of 32 neurons.
-```
+```julia
 import FlyRL: Preprocessor, VectorEncoder, ColumnPicker, DeltaPositionEncoder,
               FutureDeltaTimeEncoder, MarkovKEncoder, OrientationEncoder, SpeedEncoder,
               AngleEncoder, DeltaPositionIndexEncoder
@@ -38,13 +38,14 @@ model = Model(StationaryAgent(Dout = length(preprocessor.target.lookup),
 ```
 
 We will fit this model to the data from the following track
+
 ![](images/track1.png)
 
 For fitting we start julia with multiple threads, e.g. `julia -t8` re-run the code above,
 split the data of the last track into 8 junks (first line below), and use the `Adam`
 optimizer to fit the data for 6 hours.
 
-```
+```julia
 data = [tracks[end][i*nrow(tracks[end])÷8+1:(i+1)*nrow(tracks[end])÷8, :] for i in 0:7];
 opt = FlyRL.Adam()
 result = FlyRL.train(model, data, θ, lb = -25, ub = 25,
@@ -53,7 +54,7 @@ result = FlyRL.train(model, data, θ, lb = -25, ub = 25,
 ```
 
 Now we can simulate from the fitted model.
-```
+```julia
 import FlyRL: Environment, simulate, in_right
 
 env = Environment(; preprocessor, shock = in_right);
@@ -71,12 +72,14 @@ It looks somewhat close to an actual fly track, but the trajectory looks still a
 smooth than the recordings and the simulated fly seems to spend less time in the turns.
 
 We can also have a look at the probabilities of the next action.
-```
+```julia
 import FlyRL: plot_delta_pos_probs
 
 plot_delta_pos_probs(model.agent)
 ```
+
 ![](images/delta_pos.png)
+
 The white arrow indicates the previous action, the color indicates the log-probability of
 the next action, where dark red means high probability and white means zero probability.
 The simulated fly is about to leave the turn in the bottom right.
