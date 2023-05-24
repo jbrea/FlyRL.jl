@@ -1,6 +1,7 @@
 """
 FlyRL is a software package to fit, simulate and analyze reinforcement learning methods to
 the navigation behaviour of fruit flies in a Y-Maze with location-dependent shocks.
+The data is recorded by Riddha Manna and Ana Marija Jaksic https://www.epfl.ch/labs/jaksic-lab.
 """
 module FlyRL
 

@@ -66,17 +66,29 @@ function plot_velocity(track; egocentric = true,
     f
 end
 
+"""
+$SIGNATURES
+
+Plots the probabilities of changes in x and y direction for a [`DeltaPositionModel`](@ref).
+"""
 function plot_delta_pos_probs(agent; transform = log, kwargs...)
     plot_delta_pos_probs(transform.(agent.π),
                          agent.model; kwargs...)
 end
-function plot_delta_pos_probs(π, delta_position_model; f = Figure(), colormap = :bilbao)
-    ax = Makie.Axis(f[1, 1], autolimitaspect = 1, yreversed = true)
+"""
+$SIGNATURES
+"""
+function plot_delta_pos_probs(π, delta_position_model; f = Figure(resolution = (400, 400)), colormap = :bilbao)
+    ax = Makie.Axis(f[1, 1], autolimitaspect = 1, yreversed = true, ylabel = "Δy", xlabel = "Δx")
     CairoMakie.heatmap!(ax,
                         delta_position_model.dx,
                         delta_position_model.dy,
                         π,
                         colormap = colormap)
+    ox = [delta_position_model.state.oxˌ1]
+    oy = [delta_position_model.state.oyˌ1]
+    s = delta_position_model.state.speedˌ1 * DEFAULT_Δt
+    arrows!(ax, -s*ox, -s*oy, s*ox, s*oy, color = :white, linewidth = 3)
     f
 end
 
@@ -252,10 +264,10 @@ end
 $SIGNATURES
 
 """
-function plot_summary(summary, tracks; f = Figure())
+function plot_summary(summary, tracks; f = Figure(), sortperm = 1:length(tracks))
     data = summarize.(Ref(summary), tracks)
-    ax = Makie.Axis(f[1, 1], ylabel = replace(string(keys(data[1])[1]), '_' => ' '))
-    scatter!(ax, 1:length(data), first.(data))
+    ax = Makie.Axis(f[1, 1], xlabel = "track id", ylabel = replace(string(keys(data[1])[1]), '_' => ' '))
+    scatter!(ax, eachindex(data), first.(data)[sortperm])
     hlines!(ax, chance_level(summary))
     f
 end
@@ -266,9 +278,10 @@ Plot some summary statistics for a collection of `tracks`.
 """
 function plot_summaries(tracks; f = Figure(),
         summaries = (RelativeTimeInShockArm(), ChangeOf(RelativeTimeInShockArm()),
-                     RelativeVisitsToShockArm(), ChangeOf(RelativeVisitsToShockArm())))
+                     RelativeVisitsToShockArm(), ChangeOf(RelativeVisitsToShockArm())),
+        sortperm = 1:length(tracks))
     for (i, summary) in pairs(summaries)
-        plot_summary(summary, tracks, f = f[1, i])
+        plot_summary(summary, tracks; f = f[1, i], sortperm)
     end
     f
 end

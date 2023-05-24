@@ -23,6 +23,19 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
+CSV = "0.10"
+CairoMakie = "0.10"
+CategoricalArrays = "0.10"
+ComponentArrays = "0.13"
+DataFrames = "1"
+DocStringExtensions = "0.9"
+Enyme = "0.11.1"
+EnzymeCore = "0.3"
+NLopt = "0.6"
+Optim = "1"
+RollingFunctions = "0.7"
+StaticArrays = "1"
+StatsBase = "0.33"
 julia = "1.9"
 
 [extras]

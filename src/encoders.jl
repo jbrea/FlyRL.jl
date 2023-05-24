@@ -881,7 +881,7 @@ end
 
 Merge subsequent states of `compress_on` into one state.
 ## Example
-encode(DynamicCompressEncoder(StanHMCAdaptor()), random_track()) |> DataFrame
+encode(DynamicCompressEncoder(ShockArmEncoder()), random_track()) |> DataFrame
 """
 function DynamicCompressEncoder(compress_on::Union{Symbol,NTuple{N,Symbol}}, e...) where N
     if isa(compress_on, Symbol)
