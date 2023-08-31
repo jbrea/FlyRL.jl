@@ -117,8 +117,10 @@ function preprocess(
     if subsample_resolution > 1
         df = subsample(df, resolution = subsample_resolution)
     end
-    for e in encoders
-        encode!(e, df)
+    if nrow(df) > 0
+        for e in encoders
+            encode!(e, df)
+        end
     end
     df
 end

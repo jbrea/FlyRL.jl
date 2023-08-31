@@ -38,6 +38,12 @@ function softmax(logits)
     em = exp.(logits .- m)
     em ./ sum(em)
 end
+function normalize_softmax!(π, rm = maximum(π))
+    @. π = exp(π - rm)
+    s = sum(π)
+    π ./= s
+    π
+end
 function softmax!(π, model, x)
     rm = 0.
     for i in eachindex(π)
@@ -46,15 +52,22 @@ function softmax!(π, model, x)
             rm = tmp
         end
     end
-    s = 0.
-    for i in eachindex(π)
-        π[i] = exp(π[i] - rm)
-        s += π[i]
+    normalize_softmax!(π, rm)
+end
+
+function softmax!(π, model::MLP, x::NamedTuple{(:delta_position_input, :mask)})
+    model(x.delta_position_input)
+    out = last(model.layers).output
+    j = 1
+    for (i, m) in pairs(x.mask)
+        if m == 0
+            π[i] = -Inf
+        else
+            π[i] = out[j]
+            j += 1
+        end
     end
-    for i in eachindex(π)
-        π[i] /= s
-    end
-    π
+    normalize_softmax!(π)
 end
 
 struct CircularArray{T,L} <: AbstractVector{T}
@@ -204,6 +217,9 @@ EnzymeRules.inactive(::typeof(encode!), args...) = nothing
 #     end
     ret
 end
+
+
+
 struct PolicyGradientAgent{T,M,L}
     model::M
     π::CircularArray{Vector{T},L}
@@ -321,6 +337,7 @@ function logprob!(res, agent::StationaryAgent{M,T}, input, target, shock, params
 #         @show agent.model.state agent.model.encoded input[t]
 #         Main.t += 1
 #         @show maximum(π) sort(π)[end-10:end] π[target[t]]
+#         @show log(π[target[t]])
         res[] += log(π[target[t]])
 #         @show res[]
     end

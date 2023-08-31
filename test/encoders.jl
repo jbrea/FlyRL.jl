@@ -23,3 +23,21 @@ import InteractiveUtils: subtypes
         end
     end
 end
+
+@testset "DataFrameRow" begin
+    df = DataFrame(x = 100 .+ [0, 2, 4, 8], y = 100 .+ [1, 6, 3, 2], t = [.1, .2, .15, .3])
+    encoder = FlyRL.VectorEncoder(FlyRL.AngleEncoder(), FlyRL.FourWallsEncoder())
+    x1 = FlyRL.encode(encoder, df)
+    FlyRL.encode!(FlyRL.MarkovKEncoder(2, FlyRL.ColumnsPicker(:x, :y, :t), FlyRL.OrientationEncoder()), df)
+    df2 = deepcopy(df)
+    x2 = FlyRL.encode(encoder, df)
+    @test x1 == x2
+    x3 = FlyRL.encode.(Ref(encoder), eachrow(df)) |> FlyRL._vecnt2ntvec
+    @test x1 == x3
+    cols2keep = filter(x -> x ∈ ("x", "y", "t") || !isnothing(match(r"ˌ", "$x")), names(df))
+    df.oxˌ1[1] = df.ox[1]
+    df.oyˌ1[1] = df.oy[1]
+    df3 = select(df, cols2keep)
+    x5 = FlyRL.encode.(Ref(encoder), eachrow(df3)) |> FlyRL._vecnt2ntvec
+    @test x == x5
+end

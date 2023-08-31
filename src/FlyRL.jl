@@ -5,7 +5,7 @@ The data is recorded by Riddha Manna and Ana Marija Jaksic https://www.epfl.ch/l
 """
 module FlyRL
 
-using CairoMakie, StatsBase, CategoricalArrays, DataFrames, Printf
+using CairoMakie, StatsBase, CategoricalArrays, DataFrames, Printf, LinearAlgebra
 using CSV, RollingFunctions, Serialization
 using StaticArrays, ComponentArrays
 using Enzyme, Optim, NLopt

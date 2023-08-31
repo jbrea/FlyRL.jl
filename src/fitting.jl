@@ -25,12 +25,6 @@ function zero!(x::AbstractVector{<:AbstractVector})
     end
     x
 end
-# quick fix for https://github.com/jonniedie/ComponentArrays.jl/issues/206
-function Base.zero(x::ComponentVector{Bool, Vector{Bool}})
-    y = similar(x)
-    y .= 0
-    y
-end
 function grad_logprob!(
     agent,
     dagent,

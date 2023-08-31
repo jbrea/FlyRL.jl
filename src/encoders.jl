@@ -4,13 +4,13 @@ $SIGNATURES
 
 Encode `track` with `encoder`.
 """
-encode(encoder, track::DataFrame)
+encode(encoder, track)
 """
 $SIGNATURES
 
 Encode `track` with `encoder` and store result in data frame `track`.
 """
-encode!(encoder, track::DataFrame)
+encode!(encoder, track)
 
 # For internal use:
 # encode!(encoder, out::ComponentArray, in::ComponentArray)
@@ -23,14 +23,14 @@ encode!(encoder, track::DataFrame)
 
 abstract type AbstractEncoder end
 
-function encode!(e::AbstractEncoder, track::DataFrame)
+function encode!(e::AbstractEncoder, track)
     for (k, v) in pairs(encode(e, track))
         setproperty!(track, k, v)
     end
     track
 end
-hascols(e::AbstractEncoder, track::DataFrame) = all(hasproperty.(Ref(track), labels(e)))
-function getcols(e::AbstractEncoder, track::DataFrame)
+hascols(e::AbstractEncoder, track) = all(hasproperty.(Ref(track), labels(e)))
+function getcols(e::AbstractEncoder, track)
     l = labels(e)
     NamedTuple{l}(tuple(getproperty.(Ref(track), l)...))
 end
@@ -108,7 +108,12 @@ labels(::Distance2WallsEncoder{8}) = (:ahead, :right_a, :right, :right_b, :left_
 function _vecnt2ntvec(data)
     NamedTuple{keys(data[1])}(tuple(([data[j][i] for j in eachindex(data)] for i in eachindex(data[1]))...))
 end
-function encode(e::Distance2WallsEncoder, track::DataFrame)
+_vecnt2ntvec(data::NamedTuple) = data
+function _ntvec2vecnt(data)
+    [NamedTuple{keys(data)}(map(x -> x[i], values(data)))
+     for i in eachindex(first(data))]
+end
+function encode(e::Distance2WallsEncoder, track)
     hascols(e, track) && return getcols(e, track)
     ox, oy = encode(OrientationEncoder(), track)
     _vecnt2ntvec(distance2walls.(Ref(e), track.x, track.y, ox, oy))
@@ -185,10 +190,21 @@ function first_orientation(Δx, Δy)
     end
     return 1.0, 0.0
 end
-function encode(e::OrientationEncoder, track::DataFrame)
+function encode(e::OrientationEncoder, track)
     hascols(e, track) && return getcols(e, track)
     Δx, Δy = encode(DeltaPositionEncoder(), track)
-    encode(e, Δx, Δy)
+    if hasproperty(track, :oxˌ1) && hasproperty(track, :oyˌ1)
+        oxˌ1 = track.oxˌ1
+        oyˌ1 = track.oyˌ1
+        tmp = orientation.(Δx, Δy, speed.(Δx, Δy), oxˌ1, oyˌ1)
+        if isa(tmp, Tuple)
+            (; ox = first(tmp), oy = last(tmp))
+        else
+            (; ox = first.(tmp), oy = last.(tmp))
+        end
+    else
+        encode(e, Δx, Δy)
+    end
 end
 function encode(::OrientationEncoder, Δx, Δy)
     T = length(Δx)
@@ -231,13 +247,62 @@ function DeltaPositionIndexEncoder(; kwargs...)
     DeltaPositionIndexEncoder(Dict((dxi, dyi) => i for (i, (dxi, dyi)) in enumerate(zip(dx, dy))), dx, dy)
 end
 labels(::DeltaPositionIndexEncoder) = (:delta_position_index,)
-function encode(e::DeltaPositionIndexEncoder, track::DataFrame)
+function encode(e::DeltaPositionIndexEncoder, track)
     hascols(e, track) && return getcols(e, track)
     Δx, Δy = encode(DeltaPositionEncoder(), track)
     encode(e, Δx, Δy)
 end
 function encode(e::DeltaPositionIndexEncoder, Δx, Δy)
     (; delta_position_index = [get(e.lookup, (Δxi, Δyi), missing) for (Δxi, Δyi) in zip(Δx, Δy)])
+end
+
+"""
+"""
+struct DeltaPositionInputEncoder{E} <: AbstractEncoder
+    encoder::E
+    dx::Vector{Int}
+    dy::Vector{Int}
+end
+labels(::DeltaPositionInputEncoder) = (:delta_position_input, :mask)
+function DeltaPositionInputEncoder(;
+        encoder = VectorEncoder(EightWallsEncoder(),
+                                MarkovKEncoder(2, AngleEncoder2D()),
+                                MarkovKEncoder(2, SpeedEncoder()),
+#                                 ColumnPicker(:x), ColumnPicker(:y),
+#                                 DeltaPositionEncoder(),
+                               ),
+        kwargs...)
+    dx, dy = delta_position_grid(; kwargs...)
+    DeltaPositionInputEncoder(encoder, dx, dy)
+end
+function encode(e::DeltaPositionInputEncoder, track)
+    hascols(e, track) && return getcols(e, track)
+    track_copy = select(track, [:x, :y])
+    if hasproperty(track, :t)
+        track_copy.t = track.t
+    end
+    encode!(MarkovKEncoder(2, ColumnsPicker(:x, :y, :t), OrientationEncoder(), AngleEncoder()), track_copy)
+    encode!.(e.encoder.encoders, Ref(track_copy))
+    track_copy.oxˌ1[1] = track_copy.ox[1]
+    track_copy.oyˌ1[1] = track_copy.oy[1]
+    cols2keep = filter(x -> x ∈ ("x", "y", "t") || !isnothing(match(r"ˌ", "$x")), names(track_copy))
+    track_copy = select(track_copy, cols2keep)
+    encode_all_next.(Ref(e), eachrow(track_copy[3:end, :])) |> _vecnt2ntvec
+end
+function encode_all_next(e, row)
+    tmp = [begin
+            row.x = row.xˌ1 + dxi
+            row.y = row.yˌ1 + dyi
+            if in_maze(row.x, row.y)
+                encode(e.encoder, row).vectors
+            else
+                nothing
+            end
+          end
+          for (dxi, dyi) in zip(e.dx, e.dy)]
+    mask = tmp .!== nothing
+    tmp[(!).(mask)] .= Ref(zeros(maximum(length(tmp[mask][1]))))
+    (; delta_position_input = hcat(tmp...), mask)
 end
 
 
@@ -260,7 +325,7 @@ end
 with_outliers(x, with_outliers; outlier = "outlier") = ifelse(with_outliers, [x; outlier], x)
 levels(e::ArmEncoder) = (e.levels,)
 labels(::ArmEncoder) = (:arm,)
-function encode(e::ArmEncoder, track::DataFrame)
+function encode(e::ArmEncoder, track)
     hascols(e, track) && return getcols(e, track)
     (;
         arm = categorical(
@@ -293,7 +358,7 @@ function ShockArmEncoder(; with_outliers = false)
 end
 levels(e::ShockArmEncoder) = (e.levels,)
 labels(::ShockArmEncoder) = (:shock_arm,)
-function encode(e::ShockArmEncoder, track::DataFrame)
+function encode(e::ShockArmEncoder, track)
     hascols(e, track) && return getcols(e, track)
     (;
         shock_arm = categorical(
@@ -325,7 +390,7 @@ function SemanticEncoder3(; with_outliers = false)
 end
 levels(e::SemanticEncoder3) = (e.levels,)
 labels(::SemanticEncoder3) = (:se3,)
-function encode(e::SemanticEncoder3, track::DataFrame)
+function encode(e::SemanticEncoder3, track)
     hascols(e, track) && return getcols(e, track)
     (;
         se3 = categorical(
@@ -362,7 +427,7 @@ function SemanticEncoder7(; with_outliers = false)
 end
 levels(e::SemanticEncoder7) = (e.levels,)
 labels(::SemanticEncoder7) = (:se7,)
-function encode(e::SemanticEncoder7, track::DataFrame)
+function encode(e::SemanticEncoder7, track)
     hascols(e, track) && return getcols(e, track)
     (;
         se7 = categorical(
@@ -388,7 +453,7 @@ end
 Encodes velocities based on Δx, Δy and Δt.
 """
 struct VelocityEncoder <: AbstractEncoder end
-function encode(e::VelocityEncoder, track::DataFrame)
+function encode(e::VelocityEncoder, track)
     hascols(e, track) && return getcols(e, track)
     Δt, = encode(DeltaTimeEncoder(), track)
     Δx, Δy = encode(DeltaPositionEncoder(), track)
@@ -411,19 +476,13 @@ Encodes `Δx` and `Δy` from `x` and `y`.
 $DELTA_CONVENTION_DOCSTRING
 """
 struct DeltaPositionEncoder <: AbstractEncoder end
-function encode(e::DeltaPositionEncoder, track::DataFrame)
+function encode(e::DeltaPositionEncoder, track)
     hascols(e, track) && return getcols(e, track)
-    encode(e, track.x, track.y)
+    x, xˌ1, y, yˌ1 = encode(MarkovKEncoder(2, ColumnPicker(:x), ColumnPicker(:y)), track)
+    encode(e, x, xˌ1, y, yˌ1)
 end
-function encode(::DeltaPositionEncoder, x, y)
-    T = length(x)
-    Δx = Array{Union{Float64,Missing}}(undef, T)
-    Δy = Array{Union{Float64,Missing}}(undef, T)
-    for i = 2:T
-        Δx[i] = x[i] - x[i-1]
-        Δy[i] = y[i] - y[i-1]
-    end
-    (; Δx, Δy)
+function encode(::DeltaPositionEncoder, x, xˌ1, y, yˌ1)
+    (; Δx = x - xˌ1, Δy = y - yˌ1)
 end
 labels(::DeltaPositionEncoder) = (:Δx, :Δy)
 
@@ -438,10 +497,11 @@ Base.@kwdef struct DeltaTimeEncoder <: AbstractEncoder
     default_Δt::Float64 = DEFAULT_Δt
 end
 labels(::DeltaTimeEncoder) = (:Δt,)
-function encode(e::DeltaTimeEncoder, track::DataFrame)
+function encode(e::DeltaTimeEncoder, track)
     hascols(e, track) && return getcols(e, track)
     if hasproperty(track, :t)
-        Δt = [missing; track.t[2:end] - track.t[1:end-1]]
+        t, tˌ1 = encode(MarkovKEncoder(2, ColumnPicker(:t)), track)
+        Δt = t - tˌ1
     else
         Δt = fill(e.default_Δt, nrow(track))
     end
@@ -457,7 +517,7 @@ Base.@kwdef struct FutureDeltaTimeEncoder <: AbstractEncoder
     default_Δt::Float64 = DEFAULT_Δt
 end
 labels(::FutureDeltaTimeEncoder) = (:futureΔt,)
-function encode(e::FutureDeltaTimeEncoder, track::DataFrame)
+function encode(e::FutureDeltaTimeEncoder, track)
     hascols(e, track) && return getcols(e, track)
     Δt, = encode(DeltaTimeEncoder(), track)
     (; futureΔt = [Δt; missing])
@@ -476,33 +536,28 @@ If `return_outliers = true`, return also a vector of outlier values.
 function SpeedEncoder(; outlier_threshold = 160, return_outliers = false)
     SpeedEncoder{return_outliers}(outlier_threshold)
 end
-function encode(e::SpeedEncoder, track::DataFrame)
+function encode(e::SpeedEncoder, track)
     hascols(e, track) && return getcols(e, track)
     vx, vy = encode(VelocityEncoder(), track)
     encode(e, vx, vy)
 end
 labels(::SpeedEncoder{true}) = (:speed, :speed_outlier)
 labels(::SpeedEncoder{false}) = (:speed,)
-function encode(e::SpeedEncoder{return_outliers}, vx, vy) where return_outliers
-    T = length(vx)
-    speed = Array{Union{Float64,Missing}}(undef, T)
-    if return_outliers
-        speed_outlier = Array{Union{Float64,Missing}}(undef, T)
+function encode(e::SpeedEncoder{ret_out}, vx::T, vy::T) where {ret_out,T<:Union{Number,Missing}}
+    n = FlyRL.speed(vx, vy)
+    speed = missing
+    if !ismissing(n) && n ≤ e.outlier_threshold
+        speed = n
+    elseif ret_out
+        speed_outlier = n
     end
-    for i = 1:T
-        n = FlyRL.speed(vx[i], vy[i])
-        if !ismissing(n) && n ≤ e.outlier_threshold
-            speed[i] = n
-        elseif return_outliers
-            speed_outlier[i] = n
-        end
-    end
-    if return_outliers
+    if ret_out
         (; speed, speed_outlier)
     else
         (; speed)
     end
 end
+encode(e::SpeedEncoder, vx, vy) = _vecnt2ntvec(encode.(Ref(e), vx, vy))
 function speed(vx, vy)
     (ismissing(vx) || ismissing(vy)) && return missing
     vx == vy == zero(vx) && return zero(vx)
@@ -528,19 +583,14 @@ $DELTA_CONVENTION_DOCSTRING
 struct AngleEncoder <: AbstractEncoder end
 angle(x, y) = angle(x[1], x[2], y[1], y[2])
 angle(ox, oy, old_ox, old_oy) = atan(ox * old_oy - oy * old_ox, ox * old_ox + oy * old_oy)
-function encode(e::AngleEncoder, track::DataFrame)
+function encode(e::AngleEncoder, track)
     hascols(e, track) && return getcols(e, track)
     speed, = encode(SpeedEncoder(), track)
-    ox, oy = encode(OrientationEncoder(), track)
-    encode(e, speed, ox, oy)
+    ox, oxˌ1, oy, oyˌ1 = encode(MarkovKEncoder(2, OrientationEncoder()), track)
+    encode(e, speed, ox, oxˌ1, oy, oyˌ1)
 end
-function encode(::AngleEncoder, speed, ox, oy)
-    T = length(ox)
-    angle = Array{Union{Float64,Missing}}(undef, T)
-    for i = 2:T
-        angle[i] = FlyRL.angle(ox[i], oy[i], ox[i-1], oy[i-1], speed[i])
-    end
-    (; angle)
+function encode(::AngleEncoder, speed, ox, oxˌ1, oy, oyˌ1)
+    (; angle = FlyRL.angle.(ox, oy, oxˌ1, oyˌ1, speed))
 end
 function angle(ox, oy, old_ox, old_oy, speed)
     (ismissing(speed) || speed == 0) && return 0.
@@ -560,7 +610,7 @@ Encodes angles as `(sin(angle), cos(angle))` (see also [`AngleEncoder`](@ref)).
 """
 struct AngleEncoder2D <: AbstractEncoder end
 labels(::AngleEncoder2D) = (:sin_angle, :cos_angle)
-function encode(e::AngleEncoder2D, track::DataFrame)
+function encode(e::AngleEncoder2D, track)
     hascols(e, track) && return getcols(e, track)
     angle = encode(AngleEncoder(), track).angle
     (sin_angle = sin.(angle), cos_angle = cos.(angle))
@@ -580,7 +630,7 @@ Picks a column from a data frame.
 struct ColumnPicker <: AbstractEncoder
     colname::Symbol
 end
-function encode(e::ColumnPicker, track::DataFrame)
+function encode(e::ColumnPicker, track)
     (; e.colname => getproperty(track, e.colname))
 end
 @inline function encode!(e::ColumnPicker, out::ComponentArray, in::ComponentArray)
@@ -590,12 +640,26 @@ end
 labels(e::ColumnPicker) = (e.colname,)
 
 """
+    ColumnsPicker(colnames::NTuple{N, Symbol})
+
+Picks columns from a data frame.
+"""
+struct ColumnsPicker{N} <: AbstractEncoder
+    colnames::NTuple{N,Symbol}
+end
+ColumnsPicker(colnames...) = ColumnsPicker(colnames)
+labels(e::ColumnsPicker) = e.colnames
+function encode(e::ColumnsPicker, track)
+    NamedTuple{e.colnames}(getproperty.(Ref(track), e.colnames))
+end
+
+"""
     InShockArmEncoder()
 
 Encodes if the position is in the shock arm.
 """
 struct InShockArmEncoder <: AbstractEncoder end
-function encode(e::InShockArmEncoder, track::DataFrame)
+function encode(e::InShockArmEncoder, track)
     hascols(e, track) && return getcols(e, track)
     (; inshockarm = [shock_function(pat)(x, y)
                      for (pat, x, y) in zip(track.pattern, track.x, track.y)])
@@ -625,7 +689,7 @@ function color(pattern, x, y, colordict = Dict('B' => "blue", 'G' => "green", 'R
     in_right(x, y) && return colordict[pattern[3]]
     return "black"
 end
-function encode(e::ColorEncoder, track::DataFrame)
+function encode(e::ColorEncoder, track)
     hascols(e, track) && return getcols(e, track)
     (;
         color = categorical(
@@ -645,7 +709,7 @@ struct LevelEncoder{E} <: AbstractEncoder
 end
 labels(e::LevelEncoder) = (Symbol("$(labels(e.encoder)[1])_level"),)
 levels(e::LevelEncoder) = levels(e.encoder)
-function encode(e::LevelEncoder, track::DataFrame)
+function encode(e::LevelEncoder, track)
     hascols(e, track) && return getcols(e, track)
     NamedTuple{labels(e)}((levelcode.(first(encode(e.encoder, track))),))
 end
@@ -723,22 +787,22 @@ function bubble_up_idxs(encoders, track)
     end
     data, compressed_stream_idxs
 end
-function encode(e::VectorEncoder{T}, track::DataFrame) where T
+function encode(e::VectorEncoder{T}, track) where T
     data, compressed_stream_idxs = bubble_up_idxs(e.encoders, track)
     N = length(first(data))
     M = length(e.keys)
-    vectors = [[ComponentVector(NamedTuple{e.keys}(zeros(T, M))) for _ = 1:N]; missing]
+    vectors = [[ComponentVector(NamedTuple{e.keys}(zeros(T, M))) for _ in 1:N]; missing]
     k = 1
     o = Base.RefValue{Int}(0)
     idxs = Int[]
-    for i = 1:N
+    for i in 1:N
         if e.with_intercept
             vectors[k].intercept = 1
         end
         o[] = 0
         skip = false
         for v in data
-            if any(ismissing.(v[i]))
+            if ismissing(v) || any(ismissing.(v[i]))
                 if e.dropmissing
                     skip = true
                 else
@@ -753,9 +817,9 @@ function encode(e::VectorEncoder{T}, track::DataFrame) where T
         k += 1
     end
     if isnothing(compressed_stream_idxs)
-        (; vectors = vectors[1:(k - 1)])
+        (; vectors = k == 2 ? vectors[1] : vectors[1:(k - 1)])
     else
-        (; vectors = vectors[1:(k - 1)], compressed_stream_idxs = compressed_stream_idxs[idxs])
+        (; vectors = k == 2 ? vectors[1] : vectors[1:(k - 1)], compressed_stream_idxs = compressed_stream_idxs[idxs])
     end
 end
 @inline function encode!(e::VectorEncoder, out::ComponentArray, in::ComponentArray)
@@ -827,16 +891,33 @@ end
 function levels(e::MarkovKEncoder{K}) where K
     tuple(vcat([fill(l, K) for l in Iterators.flatten(levels.(e.encoders))]...)...)
 end
-function encode(e::MarkovKEncoder{K}, track::DataFrame) where K
+function _markov(l, d, track, K)
+    tmp = [begin
+        li = add_suffix(l, k-1)
+        if hasproperty(track, li)
+            getproperty(track, li)
+        elseif k == 1
+            d
+        else
+            [fill(missing, k-1); d[1:end-k+1]]
+        end
+     end
+     for k in 1:K]
+     tmp
+end
+function encode(e::MarkovKEncoder{K}, track) where K
     hascols(e, track) && return getcols(e, track)
     data, compressed_stream_idxs = bubble_up_idxs(e.encoders, track)
     l = labels(e)
-    newdata = vcat([[[fill(missing, k-1); d[1:end-k+1]] for k in 1:K] for d in data]...)
+    newdata = vcat([_markov(l, d, track, K) for (l, d) in pairs(data)]...)
     if !isnothing(compressed_stream_idxs)
         l = tuple(l..., :compressed_stream_idxs)
         newdata = [newdata..., compressed_stream_idxs]
     end
     NamedTuple{l}(newdata)
+    # use old col values if they exist in track
+#     oldkeys = tuple(intersect(l, Symbol.(names(track)))...)
+#     merge(NamedTuple{l}(newdata), NamedTuple{oldkeys}(getproperty.(Ref(track), oldkeys)))
 end
 # This is a hack!
 function encode!(::MarkovKEncoder{2,<:Tuple{<:AngleEncoder2D}}, out::ComponentArray, in::ComponentArray)
@@ -898,18 +979,46 @@ end
 function levels(e::DynamicCompressEncoder)
     tuple(Iterators.flatten(levels.(e.encoders))...)
 end
-function encode(e::DynamicCompressEncoder, track::DataFrame)
-    data = merge(encode.(e.encoders, Ref(track))...)
-    compressed_stream_idxs = [1]
+function encode(e::DynamicCompressEncoder, track)
+    data, compressed_stream_idxs = bubble_up_idxs(e.encoders, track)
+    idxs = [1]
     colstocheck = getproperty.(Ref(data), e.compress_on)
     state = first.(colstocheck)
-    for i = 2:nrow(track)
+    for i = 2:length(colstocheck[1])
         newstate = getindex.(colstocheck, i)
         if newstate != state
             state = newstate
-            push!(compressed_stream_idxs, i)
+            push!(idxs, i)
         end
     end
-    ks = tuple(labels(e)..., :compressed_stream_idxs)
-    NamedTuple{ks}(tuple(getindex.(values(data), Ref(compressed_stream_idxs))..., compressed_stream_idxs))
+    if !isnothing(compressed_stream_idxs)
+        compressed_stream_idxs = compressed_stream_idxs[idxs]
+    else
+        compressed_stream_idxs = idxs
+    end
+    l = tuple(labels(e)..., :compressed_stream_idxs)
+    NamedTuple{l}(tuple(getindex.(values(data), Ref(idxs))..., compressed_stream_idxs))
+end
+
+struct FilterEncoder{E, C} <: AbstractEncoder
+    encoders::E
+    condition::C
+end
+FilterEncoder(c::Function, e...) = FilterEncoder{typeof(e), typeof(c)}(e, c)
+function labels(e::FilterEncoder)
+    tuple(Iterators.flatten(labels.(e.encoders))...)
+end
+function levels(e::FilterEncoder)
+    tuple(Iterators.flatten(levels.(e.encoders))...)
+end
+function encode(e::FilterEncoder, track)
+    data, compressed_stream_idxs = bubble_up_idxs(e.encoders, track)
+    idxs = findall(e.condition(data))
+    if !isnothing(compressed_stream_idxs)
+        compressed_stream_idxs = compressed_stream_idxs[idxs]
+    else
+        compressed_stream_idxs = idxs
+    end
+    l = tuple(labels(e)..., :compressed_stream_idxs)
+    NamedTuple{l}(tuple(getindex.(values(data), Ref(idxs))..., compressed_stream_idxs))
 end

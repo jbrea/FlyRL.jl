@@ -3,7 +3,7 @@
 ####
 struct DenseLayer{F,T}
     func::F
-    output::Vector{T}
+    output::Matrix{T}
     w::Matrix{T}
     b::Vector{T}
 end
@@ -18,21 +18,17 @@ $SIGNATURES
 
 Makes a dense layer.
 """
-function DenseLayer(Din, Dout, f; T = Float64, w = glorot_normal(Din, Dout, T), b = zeros(T, Dout))
-    DenseLayer(f, zeros(T, Dout), w, b)
+function DenseLayer(Din, Dout, f; T = Float64, w = glorot_normal(Din, Dout, T), b = zeros(T, Dout), batchsize = 1)
+    DenseLayer(f, zeros(T, Dout, batchsize), w, b)
 end
 function (d::DenseLayer{F,T})(x) where {F,T}
-    out = d.output
     w = d.w
     b = d.b
     f = d.func
-    for i in eachindex(out)
-        tmp = b[i]
-        for j in eachindex(x)
-            tmp += w[i, j] * x[j]
-        end
-        out[i] = f(tmp)
-    end
+#     out = view(d.output, axes(w, 1), axes(x, 2))
+    out = d.output
+    out .= w * x # Enzyme doesn't like mul!(out, w, x) with views for some reason
+    @. out = f(out)
     out
 end
 params(l::DenseLayer) = ComponentArray(w = l.w, b = l.b)
