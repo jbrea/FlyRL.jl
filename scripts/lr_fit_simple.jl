@@ -30,7 +30,7 @@ end
                                     warn_outliers = false);
 tracks = filter(x -> any(x.shock), tracks);
 
-@sync @distributed for track in tracks[1:20]
+@sync @distributed for track in tracks
     nrow(track) > 500 || continue
     fn = metadata(track)["filename"]
     @info "starting fit $fn"
