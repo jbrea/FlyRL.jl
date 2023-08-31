@@ -24,7 +24,7 @@ function laplace_approx(model, track, θ)
 end
 end
 
-@time tracks = FlyRL.read_directory("../data/data_jaksic_structured/",
+@time tracks = FlyRL.read_directory("../data/",
                                     drop_outliers = true,
                                     pattern = r"^track",
                                     warn_outliers = false);
