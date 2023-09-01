@@ -954,6 +954,7 @@ function encode(e::DurationPerStateEncoder, track)
 end
 
 struct DynamicCompressEncoder{E,K} <: AbstractEncoder
+    max_steps::Int
     encoders::E
     compress_on::K
 end
@@ -964,11 +965,11 @@ Merge subsequent states of `compress_on` into one state.
 ## Example
 encode(DynamicCompressEncoder(ShockArmEncoder()), random_track()) |> DataFrame
 """
-function DynamicCompressEncoder(compress_on::Union{Symbol,NTuple{N,Symbol}}, e...) where N
+function DynamicCompressEncoder(compress_on::Union{Symbol,NTuple{N,Symbol}}, e...; max_steps = typemax(Int)) where N
     if isa(compress_on, Symbol)
         compress_on = tuple(compress_on)
     end
-    DynamicCompressEncoder{typeof(e), typeof(compress_on)}(e, compress_on)
+    DynamicCompressEncoder{typeof(e), typeof(compress_on)}(max_steps, e, compress_on)
 end
 markov(e::DynamicCompressEncoder) = maximum(markov.(e.encoders))
 isdynamic(::Any) = false
@@ -986,7 +987,7 @@ function encode(e::DynamicCompressEncoder, track)
     state = first.(colstocheck)
     for i = 2:length(colstocheck[1])
         newstate = getindex.(colstocheck, i)
-        if newstate != state
+        if newstate != state || i - last(idxs) == e.max_steps
             state = newstate
             push!(idxs, i)
         end
