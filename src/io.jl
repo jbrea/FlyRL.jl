@@ -26,6 +26,7 @@ function read(root, f; preprocess = true, kwargs...)
     metadata!(track, "filename", joinpath(root, f), style = :note)
     track
 end
+read(f; kwargs...) = read(splitdir(f)...; kwargs...)
 
 """
 $SIGNATURES

@@ -69,10 +69,10 @@ sim_results = vcat([[joinpath(root, f) for f in fs if match(r"fit-.*.dat", f) !=
     @info "starting simulation $fn"
     θ = sim_result.θ
     results = []
-    for seed in 1:20
+    for seed in 1:32
         Random.seed!(seed)
         x, s, = simulate(model.agent, env, θ, sim_result.n_decisions)
-        track = decode(model.preprocessor.input, x) |> DataFrame
+        track = decode(model.preprocessor.input, x[2:end]) |> DataFrame
         track.shock = s
         res = train(model, track, θ, maxtime = 60, print_interval = 10)
         gd_res = gradient_descent_fine_tuning(model, track, res.params)
