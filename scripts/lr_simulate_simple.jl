@@ -16,7 +16,10 @@ preprocessor = Preprocessor(input = ShockArmEncoder() |>
                                     ,
                                     target = ShockArmEncoder() |>
                                              LevelEncoder);
+alt_preprocessor = Preprocessor(input = VectorEncoder(ShockArmEncoder(), intercept = true),
+                                target = LevelEncoder(ShockArmEncoder()))
 model = Model(PolicyGradientAgent(Din = 5, Dout = 3), preprocessor);
+alt_model = Model(PolicyGradientAgent(Din = 5, Dout = 3), alt_preprocessor);
 env = Environment(; preprocessor, shock = FlyRL.in_shock_arm);
 function lr_scan(l0, model, input, target, shock, params, dp)
     for η in 2. .^ (-60:0)
@@ -71,14 +74,14 @@ sim_results = vcat([[joinpath(root, f) for f in fs if match(r"fit-.*.dat", f) !=
     results = []
     for seed in 1:32
         Random.seed!(seed)
-        x, s, = simulate(model.agent, env, θ, sim_result.n_decisions)
+        x, s, = simulate(model.agent, env, θ, sim_result.n_decisions + 1)
         track = decode(model.preprocessor.input, x[2:end]) |> DataFrame
         track.shock = s
-        res = train(model, track, θ, maxtime = 60, print_interval = 10)
-        gd_res = gradient_descent_fine_tuning(model, track, res.params)
-        lp = laplace_approx(model, track, gd_res.params)
-        input, target, shock = preprocess(preprocessor, track)
-        dp = FlyRL.grad_logprob(model, input, target, shock, gd_res.params)[2]
+        res = train(alt_model, track, θ, maxtime = 60, print_interval = 10)
+        gd_res = gradient_descent_fine_tuning(alt_model, track, res.params)
+        lp = laplace_approx(alt_model, track, gd_res.params)
+        input, target, shock = preprocess(alt_preprocessor, track)
+        dp = FlyRL.grad_logprob(alt_model, input, target, shock, gd_res.params)[2]
         l = length(target)
         result = (seed = seed, track = track, θ = gd_res.params, θ0 = res.params,
                   η = gd_res.params.η, sigma_η = lp,
