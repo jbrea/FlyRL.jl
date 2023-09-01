@@ -88,6 +88,47 @@ function detect_outliers(df)
     end
 end
 
+function calibrate_simple!(df)
+    Δx = 0
+    Δy = 0
+    best = -1000
+    for dx in -20:20
+        for dy in -20:20
+            n_inmaze = sum(in_maze.(df.x .+ dx, df.y .+ dy))
+            if n_inmaze > best
+                best = n_inmaze
+                Δx = dx
+                Δy = dy
+            end
+        end
+    end
+    df.x .+= Δx
+    df.y .+= Δy
+    df
+end
+function offset_to_closest(x, y)
+    closest = Inf
+    dx = 0.
+    dy = 0.
+    for (xr, yr) in CENTER_POINTS
+        d = (x - xr)^2 + (y - yr)^2
+        if d < closest
+            closest = d
+            dx = xr - x
+            dy = yr - y
+        end
+    end
+    dx, dy
+end
+function calibrate!(df)
+    offsets = offset_to_closest.(df.x, df.y)
+    dx = round(Int, median(first.(offsets)))
+    dy = round(Int, median(last.(offsets)))
+    df.x .+= dx
+    df.y .+= dy
+    abs(dx) + abs(dy)
+end
+
 """
 $SIGNATURES
 
@@ -103,8 +144,15 @@ function preprocess(
     warn_outliers = false,
     drop_outliers = true,
     subsample_resolution = 1,
+    calibrate = true
 )
     df = drop_initial_outliers(df, tolerance = initial_outlier_tolerance)
+    if calibrate
+        for i in 1:6
+            Δ = calibrate!(df)
+            Δ == 0 && break
+        end
+    end
     if warn_outliers
         detect_outliers(df)
     end

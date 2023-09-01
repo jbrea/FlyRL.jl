@@ -7,12 +7,16 @@ end
 in_middle_turn(x, y) = (x - 100)^2 + (y - 20)^2 ≤ 16.25^2
 in_right_turn(x, y) = (x - 177)^2 + (y - 153.5)^2 ≤ 16.25^2
 in_left_turn(x, y) = (x - 22)^2 + (y - 153.5)^2 ≤ 16.25^2
-in_middle_beam(x, y) = x ≥ 91.25 && x ≤ 108.25
+in_middle_beam(x, y) = x ≥ 91.75 && x ≤ 108.25
 # (110-8/sin(π/3))*sqrt(3)-100 to get ≈ 74
 in_right_beam(x, y) = -x + sqrt3 * y ≥ 74 && -x + sqrt3 * y ≤ 107
 in_left_beam(x, y) = x + sqrt3 * y ≥ 274 && x + sqrt3 * y ≤ 307
 
 in_turn(x, y) = in_middle_turn(x, y) || in_left_turn(x, y) || in_right_turn(x, y)
+
+const CENTER_POINTS = [[[100, y] for y in 20:5:110];
+                       rotate.([[100, y] for y in 20:5:110], Ref([100, 110]), 120/180*π);
+                       rotate.([[100, y] for y in 20:5:110], Ref([100, 110]), -120/180*π)]
 
 function in_center(x, y)
     (in_middle_beam(x, y) && y > 88 && y < 110) ||
