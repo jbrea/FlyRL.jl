@@ -997,7 +997,7 @@ function encode(e::DynamicCompressEncoder, track)
         compressed_stream_idxs = idxs
     end
     l = tuple(labels(e)..., :compressed_stream_idxs)
-    NamedTuple{l}(tuple(getindex.(values(data), Ref(idxs))..., compressed_stream_idxs))
+    NamedTuple{l}(tuple((d -> length(d) == nrow(track) ? d[compressed_stream_idxs] : d[idxs]).(values(data))..., compressed_stream_idxs))
 end
 
 struct FilterEncoder{E, C} <: AbstractEncoder
