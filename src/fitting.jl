@@ -264,6 +264,7 @@ function train(
     fixed = nothing,
     batchsize = nothing
 )
+    params = copy(params) # don't overwrite input
     params = remove_fixed(params, fixed)
     dparams = zero(params)
     ax = getaxes(params)

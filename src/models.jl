@@ -234,8 +234,9 @@ function PolicyGradientAgent(; Din, Dout, T = Float64,
                                          CircularArray(Dout, update_lag+1; T))
 end
 update!(::DeltaPositionModel, input, π, shock, t, L, params) = nothing
-function wsample(π)
-    θ = rand()
+wsample(π) = wsample(Random.default_rng(), π)
+function wsample(rng, π)
+    θ = rand(rng)
     s = 0.
     for i in eachindex(π)
         s += π[i]
@@ -248,7 +249,8 @@ function _findfirst(x::ComponentVector)
         x[i] == 1 && return i
     end
 end
-function simulate(agent::PolicyGradientAgent{T,M,L}, env, params, N) where {T,M,L}
+function simulate(agent::PolicyGradientAgent{T,M,L}, env, params, N;
+                  rng = Random.default_rng()) where {T,M,L}
     initialize!(agent, params)
     states = [copy(state(env))]
     shocks = Float64[]
@@ -259,7 +261,7 @@ function simulate(agent::PolicyGradientAgent{T,M,L}, env, params, N) where {T,M,
         softmax!(π[t], state(agent), states[end])
 #         softmax!(π[t], state(agent), Main.input[t])
 #         @show t sum(state(agent)
-        a = wsample(π[t])
+        a = wsample(rng, π[t])
 #         a = _findfirst(Main.target[t])
         logprob += log(π[t][a])
         π[t][a] -= 1
