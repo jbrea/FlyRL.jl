@@ -69,6 +69,10 @@ sim_results = vcat([[joinpath(root, f) for f in fs if match(r"fit-.*.dat", f) !=
 @sync @distributed for sim_result_fn in sim_results
     sim_result = deserialize(sim_result_fn)
     fn = sim_result.filename
+    tmp = splitpath(fn)
+    tmp[end] = "simresult-$(tmp[end][1:end-4]).dat"
+    fitfn = joinpath(tmp)
+    isfile(fitfn) && continue
     @info "starting simulation $fn"
     θ = sim_result.θ
     results = []
@@ -88,8 +92,5 @@ sim_results = vcat([[joinpath(root, f) for f in fs if match(r"fit-.*.dat", f) !=
                   n_decisions = l, filename = fn, dp = dp, dp_norm = maximum(abs, dp))
         push!(results, result)
     end
-    tmp = splitpath(fn)
-    tmp[end] = "simresult-$(tmp[end][1:end-4]).dat"
-    fitfn = joinpath(tmp)
     serialize(fitfn, results)
 end
