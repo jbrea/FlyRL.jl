@@ -1,3 +1,8 @@
+module PlottingExt
+
+using Makie, DocStringExtensions
+import YMaze: color, in_maze, BOX_WIDTH, BOX_HEIGHT, plot_maze, plot_track
+
 function _color(track)
     if hasproperty(track, :pattern)
         color.(track.pattern, track.x, track.y)
@@ -12,8 +17,8 @@ Plot the outline of a maze and the positions of a fly (`track.x` and `track.y`).
 See also [`plot_track`](@ref). `f = Makie.Figure()`.
 """
 function plot_maze(track; f = Figure())
-    ax = Makie.Axis(f[1, 1], aspect = 200 / 180, yreversed = true)
-    grid = vec([(x, y) for x ∈ 0:.2:200, y ∈ 0:.2:180])
+    ax = Makie.Axis(f[1, 1], aspect = BOX_WIDTH / BOX_HEIGHT, yreversed = true)
+    grid = vec([(x, y) for x ∈ 0:.2:BOX_WIDTH, y ∈ 0:.2:BOX_HEIGHT])
     heatmap!(ax,
         first.(grid),
         last.(grid),
@@ -97,4 +102,4 @@ function plot_track_3D(track;
     zlims!(ax, (0, 170*cm_per_pixel))
     f
 end
-
+end
