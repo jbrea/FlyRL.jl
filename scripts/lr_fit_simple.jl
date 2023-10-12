@@ -43,7 +43,7 @@ tracks = filter(x -> any(x.shock), tracks);
     result = (θ = res.params, η = res.params.η, sigma_η = lp,
               n_decisions = l, filename = fn, dp = dp, dp_norm = maximum(abs, dp))
     tmp = splitpath(fn)
-    tmp[end] = "fit-$(tmp[end][1:end-4]).dat"
+    tmp[end] = "fit2-$(tmp[end][1:end-4]).dat"
     fitfn = joinpath(tmp)
     serialize(fitfn, result)
 end
