@@ -38,6 +38,7 @@ sim_results = vcat([[joinpath(root, f) for f in fs if match(r"fit-.*.dat", f) !=
     θ = sim_result.θ
     results = []
     for seed in 1:32
+        FlyRL.rand_state!(env, rng = Xoshiro(seed))
         x, s, = simulate(alt_model.agent, env, θ, sim_result.n_decisions + 1,
                          rng = Xoshiro(seed))
         track = decode(model.preprocessor.input, x[2:end]) |> DataFrame

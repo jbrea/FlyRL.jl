@@ -1,19 +1,5 @@
-# API
-"""
-$SIGNATURES
-
-Encode `track` with `encoder`.
-"""
-encode(encoder, track)
-"""
-$SIGNATURES
-
-Encode `track` with `encoder` and store result in data frame `track`.
-"""
-encode!(encoder, track)
-
 # For internal use:
-# encode!(encoder, out::ComponentArray, in::ComponentArray)
+# encode!(encoder, out::ComponentArray, in::ComponentArray) DEPRECATED?
 # decode(decoder, data) (only for VectorEncoder)
 # labels(encoder)
 # levels(encoder)
@@ -21,19 +7,6 @@ encode!(encoder, track)
 # The current API is probably not yet ideal.
 # - some encoders currently "bubble up" compressed_stream_idxs. Can this be done better?
 
-abstract type AbstractEncoder end
-
-function encode!(e::AbstractEncoder, track)
-    for (k, v) in pairs(encode(e, track))
-        setproperty!(track, k, v)
-    end
-    track
-end
-hascols(e::AbstractEncoder, track) = all(hasproperty.(Ref(track), labels(e)))
-function getcols(e::AbstractEncoder, track)
-    l = labels(e)
-    NamedTuple{l}(tuple(getproperty.(Ref(track), l)...))
-end
 
 function distance2wall(
     x,
@@ -126,10 +99,10 @@ function distance2walls(e::Distance2WallsEncoder{E}, x, y, ox, oy) where E
         left = distance2wall(e, x, y, -oy, ox)
     end
     if E == 8 || E == 6
-        right_a = distance2wall(e, x, y, (ox + sqrt3*oy)/2, (-sqrt3*ox + oy)/2)
-        right_b = distance2wall(e, x, y, (-ox + sqrt3*oy)/2, (-sqrt3*ox - oy)/2)
-        left_a = distance2wall(e, x, y, (ox - sqrt3*oy)/2, (sqrt3*ox + oy)/2)
-        left_b = distance2wall(e, x, y, (-ox - sqrt3*oy)/2, (sqrt3*ox - oy)/2)
+        right_a = distance2wall(e, x, y, (ox + SQRT3*oy)/2, (-SQRT3*ox + oy)/2)
+        right_b = distance2wall(e, x, y, (-ox + SQRT3*oy)/2, (-SQRT3*ox - oy)/2)
+        left_a = distance2wall(e, x, y, (ox - SQRT3*oy)/2, (SQRT3*ox + oy)/2)
+        left_b = distance2wall(e, x, y, (-ox - SQRT3*oy)/2, (SQRT3*ox - oy)/2)
     end
     if E == 4
         (; ahead, right, left, behind)
@@ -277,6 +250,10 @@ function DeltaPositionInputEncoder(;
 end
 function encode(e::DeltaPositionInputEncoder, track)
     hascols(e, track) && return getcols(e, track)
+    track_copy = _delta_position_input_prep(e, track)
+    encode_all_next.(Ref(e), eachrow(track_copy)) |> _vecnt2ntvec
+end
+function _delta_position_input_prep(e, track)
     track_copy = select(track, [:x, :y])
     if hasproperty(track, :t)
         track_copy.t = track.t
@@ -287,9 +264,9 @@ function encode(e::DeltaPositionInputEncoder, track)
     track_copy.oyˌ1[1] = track_copy.oy[1]
     cols2keep = filter(x -> x ∈ ("x", "y", "t") || !isnothing(match(r"ˌ", "$x")), names(track_copy))
     track_copy = select(track_copy, cols2keep)
-    encode_all_next.(Ref(e), eachrow(track_copy[3:end, :])) |> _vecnt2ntvec
 end
 function encode_all_next(e, row)
+    any(ismissing, row) && return (; delta_position_input = missing, mask = missing)
     tmp = [begin
             row.x = row.xˌ1 + dxi
             row.y = row.yˌ1 + dyi
@@ -309,71 +286,6 @@ end
 
 levels(e) = ntuple(_ -> Number, length(labels(e)))
 
-struct ArmEncoder <: AbstractEncoder
-    levels::Vector{String}
-end
-"""
-$SIGNATURES
-
-Encodes arms of the maze as `"left"`, `"middle"`, `"right"`, `"center"`.
-Points outside the maze are marked as `"outlier"` if `with_outliers = true`.
-"""
-function ArmEncoder(; with_outliers = false)
-    levels = FlyRL.with_outliers(["left", "middle", "right", "center"], with_outliers)
-    ArmEncoder(levels)
-end
-with_outliers(x, with_outliers; outlier = "outlier") = ifelse(with_outliers, [x; outlier], x)
-levels(e::ArmEncoder) = (e.levels,)
-labels(::ArmEncoder) = (:arm,)
-function encode(e::ArmEncoder, track)
-    hascols(e, track) && return getcols(e, track)
-    (;
-        arm = categorical(
-            encode.(Ref(e), track.x, track.y),
-            levels = levels(e)[1],
-        )
-    )
-end
-function encode(::ArmEncoder, x::Number, y::Number)
-    (in_left_arm(x, y) || in_left_turn(x, y)) && return "left"
-    (in_middle_arm(x, y) || in_middle_turn(x, y)) && return "middle"
-    (in_right_arm(x, y) || in_right_turn(x, y)) && return "right"
-    in_center(x, y) && return "center"
-    return "outlier"
-end
-
-struct ShockArmEncoder <: AbstractEncoder
-    levels::Vector{String}
-end
-"""
-$SIGNATURES
-
-Encodes arms of the maze as `"neutral A"`, `"neutral B"`, `"shock"` and `"center"`.
-Points outside the maze are marked as `"outlier"` if `with_outliers = true`.
-"""
-function ShockArmEncoder(; with_outliers = false)
-    levels = FlyRL.with_outliers(["neutral A", "neutral B", "shock", "center"],
-                                 with_outliers)
-    ShockArmEncoder(levels)
-end
-levels(e::ShockArmEncoder) = (e.levels,)
-labels(::ShockArmEncoder) = (:shock_arm,)
-function encode(e::ShockArmEncoder, track)
-    hascols(e, track) && return getcols(e, track)
-    (;
-        shock_arm = categorical(
-            encode.(Ref(e), track.x, track.y, track.pattern),
-            levels = levels(e)[1],
-        )
-    )
-end
-function encode(::ShockArmEncoder, x::Number, y::Number, pattern)
-    (in_left_arm(x, y) || in_left_turn(x, y)) && return pattern[1] == 'G' ? "shock" : "neutral A"
-    (in_middle_arm(x, y) || in_middle_turn(x, y)) && return pattern[2] == 'G' ? "shock" : pattern[1] == 'G' ? "neutral A" : "neutral B"
-    (in_right_arm(x, y) || in_right_turn(x, y)) && return pattern[3] == 'G' ? "shock" : "neutral B"
-    in_center(x, y) && return "center"
-    return "outlier"
-end
 
 struct SemanticEncoder3 <: AbstractEncoder
     levels::Vector{String}
@@ -665,39 +577,6 @@ function encode(e::InShockArmEncoder, track)
                      for (pat, x, y) in zip(track.pattern, track.x, track.y)])
 end
 labels(::InShockArmEncoder) = (:inshockarm,)
-
-struct ColorEncoder <: AbstractEncoder
-    colordict::Dict{Char,String}
-    levels::Vector{String}
-end
-"""
-$SIGNATURES
-
-Encode color based on `track.pattern`.
-"""
-function ColorEncoder(; colordict = Dict('B' => "blue", 'G' => "green", 'R' => "red"),
-                        with_outliers = false)
-    l = FlyRL.with_outliers(["gray"; values(colordict)...], with_outliers; outlier = "black")
-    ColorEncoder(colordict, l)
-end
-labels(::ColorEncoder) = (:color,)
-levels(e::ColorEncoder) = (e.levels,)
-function color(pattern, x, y, colordict = Dict('B' => "blue", 'G' => "green", 'R' => "red"))
-    in_center(x, y) && return "gray"
-    in_left(x, y) && return colordict[pattern[1]]
-    in_middle(x, y) && return colordict[pattern[2]]
-    in_right(x, y) && return colordict[pattern[3]]
-    return "black"
-end
-function encode(e::ColorEncoder, track)
-    hascols(e, track) && return getcols(e, track)
-    (;
-        color = categorical(
-            color.(track.pattern, track.x, track.y, Ref(e.colordict)),
-            levels = FlyRL.levels(e)[1],
-        )
-    )
-end
 
 """
     LevelEncoder(encoder)

@@ -1,0 +1,23 @@
+name = "YMaze"
+uuid = "69b69c5f-188d-447a-88e1-d6f22a902dac"
+authors = ["Johanni Brea <jbrea@users.noreply.github.com>"]
+version = "0.1.0"
+
+[deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+CategoricalArrays = "324d7699-5711-5eae-9e2f-1d82baa6b597"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+RollingFunctions = "b0e4dd01-7b14-53d8-9b45-175a3e362653"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

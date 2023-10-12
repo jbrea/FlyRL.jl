@@ -28,7 +28,7 @@ function (d::DenseLayer{F,T})(x) where {F,T}
 #     out = view(d.output, axes(w, 1), axes(x, 2))
     out = d.output
     out .= w * x # Enzyme doesn't like mul!(out, w, x) with views for some reason
-    @. out = f(out)
+    @. out = f(out + b)
     out
 end
 params(l::DenseLayer) = ComponentArray(w = l.w, b = l.b)
@@ -93,3 +93,15 @@ end
 (mlp::MLP)(x) = forward!(first(mlp.layers), Base.tail(mlp.layers), x)
 forward!(layer, layers, x) = forward!(first(layers), Base.tail(layers), layer(x))
 forward!(layer, ::Tuple{}, x) = layer(x)
+
+struct Standardizer{M,V}
+    means::M
+    variances::V
+end
+function Standardizer(data)
+    means = sum(data)/length(data)
+    variances = sqrt.(sum([(d - means).^2 for d in data])/(length(data)-1))
+    Standardizer(means, variances)
+end
+(s::Standardizer)(x) = (x - s.means) ./ s.variances
+unstandardize(s, x) = x .* s.variances + s.means

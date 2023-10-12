@@ -20,19 +20,25 @@ function shock_function(pattern)
 end
 shock(e::Environment) = e.shock(e.state)
 pattern(e::Environment) = e.pattern
-rand_state!(e::Environment) = e.state .= rand_state(e.preprocessor, e.pattern)
+function rand_state!(e::Environment; rng = Random.default_rng())
+    e.state .= rand_state(e.preprocessor, e.pattern, e.shock; rng)
+end
 state(e::Environment) = e.state
 """
 $SIGNATURES
 """
-function random_track(; N = 2000, pattern = "GBB", shock = shock_function(pattern))
-    x, y = random_maze_position(N = N)
+function random_track(; N = 2000,
+                        pattern = "GBB",
+                        shock = shock_function(pattern),
+                        rng = Random.default_rng())
+    x, y = random_maze_position(; N, rng)
     data = DataFrame(x = x, y = y, pattern = fill(pattern, N), t = cumsum(fill(DEFAULT_Δt, N)))
     data.shock = shock.(data.x, data.y)
     data
 end
-function rand_state(preprocessor, pattern, shock)
-    data = random_track(; pattern, shock)
+function rand_state(preprocessor, pattern, shock = shock_function(pattern);
+                    rng = Random.default_rng())
+    data = random_track(; pattern, shock, rng)
     first(first(preprocess(preprocessor, data)))
 end
 function step!(e::Environment, a)

@@ -11,11 +11,14 @@ using StaticArrays, ComponentArrays
 using Enzyme, Optim, NLopt
 using Random
 using DocStringExtensions
+using YMaze
+import YMaze: encode, encode!, AbstractEncoder, levels, labels,
+              ArmEncoder, ShockArmEncoder, ColorEncoder, plot_track,
+              plot_maze, read, read_directory, DEFAULT_Δt
 
 include("plotting.jl")
 include("io.jl")
 
-include("maze.jl")
 include("encoders.jl")
 include("summary_stats.jl")
 include("preprocessor.jl")

@@ -1,0 +1,3 @@
+# YMaze
+
+*Documentation goes here.*
