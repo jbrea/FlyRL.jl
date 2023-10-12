@@ -14,7 +14,7 @@ using DocStringExtensions
 using YMaze
 import YMaze: encode, encode!, AbstractEncoder, levels, labels,
               ArmEncoder, ShockArmEncoder, ColorEncoder, plot_track,
-              plot_maze, read, read_directory, DEFAULT_Δt,
+              plot_maze, read, read_directory, DEFAULT_Δt, with_outliers,
               in_maze, in_left, in_right, in_middle, in_turn,
               random_maze_position, hascols, getcols, SQRT3
 

@@ -11,12 +11,14 @@ import InteractiveUtils: subtypes
             e = enc(:arm, FlyRL.ArmEncoder())
         elseif enc == FlyRL.ColumnPicker
             e = enc(:shock)
+        elseif enc == FlyRL.FilterEncoder
+            e = enc(x -> x.arm .== "R", FlyRL.ArmEncoder())
         else
             e = enc()
         end
         @test length(FlyRL.labels(e)) == length(FlyRL.levels(e))
         x = FlyRL.encode(e, track)
-        if enc == FlyRL.DynamicCompressEncoder
+        if enc ∈ (FlyRL.DynamicCompressEncoder, FlyRL.FilterEncoder)
             @test keys(x) == tuple(FlyRL.labels(e)..., :compressed_stream_idxs)
         else
             @test keys(x) == FlyRL.labels(e)

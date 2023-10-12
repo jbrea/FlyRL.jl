@@ -10,8 +10,8 @@ import FlyRL: Preprocessor, DynamicCompressEncoder, VectorEncoder, ColumnPicker,
               Model, PolicyGradientAgent, params, logprob, preprocess, logprob!,
               plot_track, plot_maze, plot_probs, Environment, train, plot_compare_probs
 preprocessor = Preprocessor(input = ShockArmEncoder() |>
-                                    x -> FilterEncoder(d -> d.shock_arm .!= "center", x) |>
-                                    x -> DynamicCompressEncoder(:shock_arm, x, max_steps = 150) |>
+                                    x -> FilterEncoder(d -> d.state .!= "center", x) |>
+                                    x -> DynamicCompressEncoder(:state, x, max_steps = 150) |>
                                     x -> VectorEncoder(x, intercept = true)
                                     ,
                                     target = ShockArmEncoder() |>

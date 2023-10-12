@@ -51,10 +51,10 @@ function preprocess(
     subsample_resolution = 1,
     calibrate = true
 )
-    df = drop_initial_outliers(df, tolerance = initial_outlier_tolerance)
     if calibrate
         calibrate!(df)
     end
+    df = drop_initial_outliers(df, tolerance = initial_outlier_tolerance)
     if warn_outliers
         detect_outliers(df)
     end

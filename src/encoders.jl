@@ -902,3 +902,35 @@ function encode(e::FilterEncoder, track)
     l = tuple(labels(e)..., :compressed_stream_idxs)
     NamedTuple{l}(tuple(getindex.(values(data), Ref(idxs))..., compressed_stream_idxs))
 end
+
+struct RmShortSwitchesEncoder{E} <: AbstractEncoder
+    encoder::E
+    patience::Int
+end
+RmShortSwitchesEncoder(encoder; patience = 10) = RmShortSwitchesEncoder(encoder, patience)
+labels(e::RmShortSwitchesEncoder) = (x -> Symbol(x, "_smoothed")).(labels(e.encoder))
+levels(e::RmShortSwitchesEncoder) = levels(e.encoder)
+function encode(e::RmShortSwitchesEncoder, track)
+    data = encode(e.encoder, track) |> DataFrame
+    prev = first(eachrow(data))
+    other = prev
+    othercount = 0
+    for (i, row) in pairs(eachrow(data))
+        if row != other && row != prev # new state
+            other = row
+            othercount = 1
+        elseif row == other # still new state
+            othercount += 1
+        end
+        if othercount > e.patience # consistent switch
+            prev = row
+        elseif row == prev && row != other # quickly back
+            other = prev
+            for colname in names(data)
+                data[i-othercount:i-1, colname] .= getproperty(prev, colname)
+            end
+            othercount = 0
+        end
+    end
+    NamedTuple{labels(e)}(tuple(getproperty.(Ref(data), labels(e.encoder))...))
+end
