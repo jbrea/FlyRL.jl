@@ -74,7 +74,7 @@ function ShockArmEncoder(; with_outliers = false)
     ShockArmEncoder(levels)
 end
 levels(e::ShockArmEncoder) = (e.levels,)
-labels(::ShockArmEncoder) = (:shock_arm,)
+labels(::ShockArmEncoder) = (:state,)
 function encode(e::ShockArmEncoder, track)
     hascols(e, track) && return getcols(e, track)
     (;
