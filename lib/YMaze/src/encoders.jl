@@ -78,7 +78,7 @@ labels(::ShockArmEncoder) = (:state,)
 function encode(e::ShockArmEncoder, track)
     hascols(e, track) && return getcols(e, track)
     (;
-        shock_arm = categorical(
+        state = categorical(
             encode.(Ref(e), track.x, track.y, track.pattern),
             levels = levels(e)[1],
         )

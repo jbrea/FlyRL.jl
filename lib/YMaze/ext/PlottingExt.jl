@@ -54,7 +54,6 @@ function plot_track(track; f = Figure(resolution = (940, 320)))
     colsize!(f.layout, 2, Auto(.6))
     f
 end
-const DEFAULT_Δt = .15
 """
 $SIGNATURES
 

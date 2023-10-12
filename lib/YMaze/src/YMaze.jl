@@ -8,6 +8,8 @@ module YMaze
 using Random, CSV, RollingFunctions, DataFrames, CategoricalArrays, Statistics
 using DocStringExtensions, PrecompileTools
 
+const DEFAULT_Δt = .15
+
 include("maze.jl")
 include("encoders.jl")
 include("io.jl")

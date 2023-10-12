@@ -5,7 +5,7 @@ The data is recorded by Riddha Manna and Ana Marija Jaksic https://www.epfl.ch/l
 """
 module FlyRL
 
-using CairoMakie, StatsBase, CategoricalArrays, DataFrames, Printf, LinearAlgebra
+using StatsBase, CategoricalArrays, DataFrames, Printf, LinearAlgebra
 using CSV, RollingFunctions, Serialization
 using StaticArrays, ComponentArrays
 using Enzyme, Optim, NLopt
@@ -14,7 +14,9 @@ using DocStringExtensions
 using YMaze
 import YMaze: encode, encode!, AbstractEncoder, levels, labels,
               ArmEncoder, ShockArmEncoder, ColorEncoder, plot_track,
-              plot_maze, read, read_directory, DEFAULT_Δt
+              plot_maze, read, read_directory, DEFAULT_Δt,
+              in_maze, in_left, in_right, in_middle, in_turn,
+              random_maze_position, hascols, getcols, SQRT3
 
 include("plotting.jl")
 include("io.jl")
