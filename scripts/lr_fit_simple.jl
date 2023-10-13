@@ -25,11 +25,12 @@ end
 include("helper.jl")
 end
 
-@time tracks = FlyRL.read_directory("../data/",
-                                    drop_outliers = true,
-                                    pattern = r"^track",
-                                    warn_outliers = false);
-tracks = filter(x -> !any(x.shock), tracks);
+# @time tracks = FlyRL.read_directory("../data/",
+#                                     drop_outliers = true,
+#                                     pattern = r"^track",
+#                                     warn_outliers = false);
+tracks = deserialize("../data/tracks.dat")
+tracks = filter(x -> !any(x.raw_shock), tracks);
 # pretend they the get shocked
 for track in tracks
     nrow(track) > 0 || continue
