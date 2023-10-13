@@ -22,21 +22,23 @@ function laplace_approx(model, track, θ)
     H[2, 2] ≈ 0 && return Inf
     -1/H[2, 2]
 end
+include("helper.jl")
 end
 
 @time tracks = FlyRL.read_directory("../data/",
                                     drop_outliers = true,
                                     pattern = r"^track",
                                     warn_outliers = false);
+tracks = filter(x -> !any(x.shock), tracks);
 # pretend they the get shocked
 for track in tracks
+    nrow(track) > 0 || continue
     if any(track.raw_shock)
         track.shock = track.raw_shock
     else
-        track.shock = track.state .== "shock"
+        track.shock = track.state .== "neutral left"
     end
 end
-# tracks = filter(x -> any(x.shock), tracks);
 
 @sync @distributed for track in tracks
     nrow(track) > 500 || continue
@@ -44,14 +46,16 @@ end
     @info "starting fit $fn"
     θ = params(model)
     res = train(model, track, θ, maxtime = 60, print_interval = 10)
-    lp = laplace_approx(model, track, res.params)
+    gd_res = gradient_descent_fine_tuning(model, track, res.params)
+    lp = laplace_approx(model, track, gd_res.params)
     input, target, shock = preprocess(preprocessor, track)
-    dp = FlyRL.grad_logprob(model, input, target, shock, res.params)[2]
+    dp = FlyRL.grad_logprob(model, input, target, shock, gd_res.params)[2]
     l = length(target)
-    result = (θ = res.params, η = res.params.η, sigma_η = lp,
+    result = (θ = gd_res.params, θ0 = res.params,
+              η = gd_res.params.η, sigma_η = lp,
               n_decisions = l, filename = fn, dp = dp, dp_norm = maximum(abs, dp))
     tmp = splitpath(fn)
-    tmp[end] = "fit2-$(tmp[end][1:end-4]).dat"
+    tmp[end] = "fit2C-$(tmp[end][1:end-4]).dat"
     fitfn = joinpath(tmp)
     serialize(fitfn, result)
 end

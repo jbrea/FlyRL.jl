@@ -1,7 +1,7 @@
 using Pkg, Distributed
 Pkg.activate(@__DIR__)
 @everywhere begin
-using FlyRL, DataFrames, Serialization, FiniteDiff, Random
+using FlyRL, DataFrames, Serialization, FiniteDiff, Random, ComponentArrays
 import FlyRL: Preprocessor, DynamicCompressEncoder, VectorEncoder, ColumnPicker,
               SemanticEncoder7, ShockArmEncoder, ArmEncoder, MarkovKEncoder,
               OrientationEncoder, VelocityEncoder, DeltaPositionEncoder,
@@ -10,8 +10,8 @@ import FlyRL: Preprocessor, DynamicCompressEncoder, VectorEncoder, ColumnPicker,
               Model, PolicyGradientAgent, params, logprob, preprocess, logprob!,
               plot_track, plot_maze, plot_probs, Environment, train, plot_compare_probs
 preprocessor = Preprocessor(input = ShockArmEncoder() |>
-                                    x -> FilterEncoder(d -> d.shock_arm .!= "center", x) |>
-                                    x -> DynamicCompressEncoder(:shock_arm, x, max_steps = 150) |>
+                                    x -> FilterEncoder(d -> d.state .!= "center", x) |>
+                                    x -> DynamicCompressEncoder(:state, x, max_steps = 150) |>
                                     x -> VectorEncoder(x, intercept = true)
                                     ,
                                     target = ShockArmEncoder() |>
@@ -20,18 +20,24 @@ alt_preprocessor = Preprocessor(input = VectorEncoder(ShockArmEncoder(), interce
                                 target = LevelEncoder(ShockArmEncoder()))
 model = Model(PolicyGradientAgent(Din = 5, Dout = 3), preprocessor);
 alt_model = Model(PolicyGradientAgent(Din = 5, Dout = 3), alt_preprocessor);
-env = Environment(; preprocessor = alt_preprocessor, shock = FlyRL.in_shock_arm);
+function in_shock_arm(x::ComponentVector)
+    x.shock == 1 && return true
+    hasproperty(x, :shockˌ1) && x.shockˌ1 == 1 && return true
+    false
+end
+in_shock_arm(x, y) = false
+env = Environment(; preprocessor = alt_preprocessor, shock = in_shock_arm);
 include("helper.jl")
 end
 
-sim_results = vcat([[joinpath(root, f) for f in fs if match(r"fit-.*.dat", f) !== nothing]
+sim_results = vcat([[joinpath(root, f) for f in fs if match(r"fit2-.*.dat", f) !== nothing]
                     for (root, _, fs) in walkdir("../data/")]...)
 
 @sync @distributed for sim_result_fn in sim_results
     sim_result = deserialize(sim_result_fn)
     fn = sim_result.filename
     tmp = splitpath(fn)
-    tmp[end] = "simresult-$(tmp[end][1:end-4]).dat"
+    tmp[end] = "simresult2-$(tmp[end][1:end-4]).dat"
     fitfn = joinpath(tmp)
     isfile(fitfn) && continue
     @info "starting simulation $fn"
