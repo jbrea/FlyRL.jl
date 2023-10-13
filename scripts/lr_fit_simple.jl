@@ -28,7 +28,15 @@ end
                                     drop_outliers = true,
                                     pattern = r"^track",
                                     warn_outliers = false);
-tracks = filter(x -> any(x.shock), tracks);
+# pretend they the get shocked
+for track in tracks
+    if any(track.raw_shock)
+        track.shock = track.raw_shock
+    else
+        track.shock = track.state .== "shock"
+    end
+end
+# tracks = filter(x -> any(x.shock), tracks);
 
 @sync @distributed for track in tracks
     nrow(track) > 500 || continue
