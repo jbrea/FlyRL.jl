@@ -24,7 +24,7 @@ YMaze = "69b69c5f-188d-447a-88e1-d6f22a902dac"
 
 [compat]
 CSV = "0.10"
-CairoMakie = "0.10"
+CairoMakie = "0.10, 0.11"
 CategoricalArrays = "0.10"
 ComponentArrays = "0.13,0.14,0.15"
 DataFrames = "1"
